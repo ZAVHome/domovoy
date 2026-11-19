@@ -1,0 +1,10 @@
+{
+  "chats": [
+    {
+      "telegram_chat_id": -1001234567890,
+      "house_id": "house-main",
+      "address": "Replace with building address",
+      "title": "Building residents chat"
+    }
+  ]
+}

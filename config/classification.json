@@ -1,0 +1,38 @@
+{
+  "locations": [
+    {
+      "id": "parking",
+      "title": "Parking",
+      "categories": [
+        {
+          "id": "lighting",
+          "title": "Lighting",
+          "fields": [
+            {
+              "id": "description",
+              "title": "Describe the issue",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "parking_space",
+              "title": "Parking space number",
+              "type": "text",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grounds",
+      "title": "Building grounds",
+      "categories": []
+    },
+    {
+      "id": "section",
+      "title": "Building section",
+      "categories": []
+    }
+  ]
+}
