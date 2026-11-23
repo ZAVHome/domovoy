@@ -4,19 +4,23 @@
 
 Domovoy is a Telegram bot starter for collecting residents' reports about building management. The intended flow is for a resident to start a report in a configured building group and continue in a private chat with the bot, preserving the building context through a Telegram deep link.
 
-The current implementation is a scaffold, not a complete reporting system. It currently:
+The current implementation supports text reports end to end. It currently:
 
 - Loads environment settings and initializes the SQLite schema at startup.
-- Handles `/report` in a configured non-private chat and replies with a private-chat deep link containing `report_<telegram_chat_id>`.
-- Handles `/start`, resolves the deep-link payload back to a configured house, and displays its address.
-- Identifies the configured bootstrap administrator by Telegram user ID for an additional greeting. Persistent role management is not implemented.
+- Handles `/report` in a configured group and starts the report wizard from a private-chat deep link.
+- Collects optional resident profile details, configured text fields, and saves a report after confirmation.
+- Allows residents to page through and view their own reports with `/my_reports`.
+- Allows configured responders to process assigned houses with `/reports`; the administrator can process all houses.
+- Records status history and sends new-report and status-change notifications.
 
-Profile collection, the report wizard, report persistence, media intake, responder assignment, role management, status changes, and notifications are planned but not yet implemented. User-facing bot messages are in Russian; identifiers and code comments/docstrings are in English.
+Photo/video intake, in-bot configuration management, and persistent FSM sessions are not implemented. User-facing bot messages are in Russian; identifiers and code comments/docstrings are in English.
 
 ## Documentation Requirements
 
 - Create all project documentation in both Russian and English.
 - Keep the Russian and English versions synchronized whenever documentation is added or updated.
+- Give every work plan a unique, zero-padded three-digit sequence number. Create folders as `artifacts/NNN-short-name/`, assigning one greater than the highest existing number; never reuse a number. Store the plan and concise completion report there as English and Russian pairs (`plan.md`, `plan.ru.md`, `completion.md`, `completion.ru.md`).
+- Work plans record the goal, scope, implementation stages, and acceptance criteria. Completion reports summarize what was implemented, checks performed, and any limitations or follow-up work.
 
 ## Technology Stack
 
@@ -32,11 +36,14 @@ There is no lockfile, web framework, external database service, migration tool, 
 
 - `pyproject.toml`: package metadata, Python requirement, runtime dependencies, and setuptools configuration.
 - `src/domovoy/__main__.py`: application entry point. Loads settings, initializes the database, creates the aiogram `Bot` and `Dispatcher`, registers the router, and starts long polling. `settings` is passed through `start_polling` for injection into handlers.
-- `src/domovoy/config.py`: defines the frozen `Settings` dataclass, resolves the project root and `config/` directory, loads `.env`, validates required settings, resolves the database path, and provides `load_json_config(name)`.
-- `src/domovoy/database.py`: creates the SQLite parent directory and tables with `CREATE TABLE IF NOT EXISTS`. The schema contains `users`, `reports`, `report_fields`, `report_media`, and `report_status_history`; foreign keys and report-owned cascades are declared. There are no migrations or data-access/repository functions yet.
-- `src/domovoy/handlers.py`: contains the single aiogram `Router` and the `/report` and `/start` handlers. House configuration is loaded when these handlers need it.
+- `src/domovoy/config.py`: settings, JSON loading, and startup validation for houses, classification, statuses, and responder assignments.
+- `src/domovoy/database.py`: SQLite schema initialization and additive migrations, including report submission idempotency.
+- `src/domovoy/repository.py`: parameterized data access, paginated access-filtered queries, transactional report creation, and compare-and-set status updates.
+- `src/domovoy/states.py`: report wizard states. FSM state is memory-only and is not restart-persistent.
+- `src/domovoy/handlers.py`: report wizard, resident report views, responder processing, status changes, and notifications.
 - `src/domovoy/__init__.py`: package docstring only.
 - `config/`: sanitized JSON examples for houses, classification, statuses, and responder assignments.
+- `artifacts/`: bilingual work plans and concise completion reports in sequentially numbered folders such as `001-text-report-mvp/`.
 - `.env.example`: environment variable template.
 - `README.md`: concise setup instructions and current implementation status.
 
@@ -59,7 +66,7 @@ python -m domovoy
 
 Use `/report` in that group to receive the private-chat link. A real functional run requires valid Telegram credentials and a reachable Telegram API.
 
-`PROJECT_ROOT` is derived from `src/domovoy/config.py`, and `CONFIG_DIR` is always `<project root>/config`. `DATABASE_PATH` defaults to `./data/domovoy.sqlite3`; relative paths are resolved against the project root, not the caller's current directory. Database initialization creates missing parent directories and tables, but startup does not seed houses, statuses, responders, or roles from JSON.
+`PROJECT_ROOT` is derived from `src/domovoy/config.py`, and `CONFIG_DIR` is always `<project root>/config`. `DATABASE_PATH` defaults to `./data/domovoy.sqlite3`; relative paths are resolved against the project root, not the caller's current directory. Database initialization creates missing parent directories and applies migrations. Houses, categories, statuses, and responder assignments remain JSON-backed and are validated at startup rather than seeded into SQLite.
 
 ## Configuration Files
 
@@ -71,12 +78,12 @@ Environment variables:
 
 JSON configuration:
 
-- `config/houses.json`: top-level `chats` array. Each entry has `telegram_chat_id`, `house_id`, `address`, and `title`. This is the only JSON file currently read by runtime handlers. Chat IDs must match Telegram's integer IDs exactly, including the negative sign for groups.
-- `config/classification.json`: top-level `locations`; locations contain `categories`, and categories contain `fields` with IDs, titles, types, and required flags. This models future location-dependent report categories and fields but is not consumed by code yet.
-- `config/statuses.json`: top-level `statuses`, including an `initial` marker on the example `new` status. It is not consumed by code yet.
-- `config/responders.json`: top-level `assignments`, mapping `house_id` to `telegram_user_ids`. It is not consumed by code yet.
+- `config/houses.json`: `chats` maps exact Telegram group IDs to house IDs and addresses.
+- `config/classification.json`: `locations` contain categories and text fields; field ID `description` is stored as the report description.
+- `config/statuses.json`: statuses must be `new`, `in_progress`, `resolved`, and `closed` in that order, with only `new` marked initial.
+- `config/responders.json`: `assignments` maps each configured house ID to positive Telegram user IDs.
 
-JSON is loaded directly with `json.load`; there is no schema validation, cross-file reference validation, caching layer, or administrative configuration interface.
+JSON is validated at startup, including references from responder assignments to configured houses. There is no administrative configuration interface; edit JSON and restart the bot to apply changes.
 
 ## Coding Conventions
 
@@ -88,7 +95,7 @@ No formatter or linter is configured in `pyproject.toml`, and no formatting/lint
 
 ## Testing and Verification
 
-There is currently no test suite, test directory, test dependency, or test-runner configuration. Do not assume pytest or another framework is available.
+The test suite uses the Python standard library `unittest`; handler control tests run when the project dependency aiogram is installed. Run `python -m unittest discover -s tests`.
 
 A standard-library syntax check can be run with:
 
@@ -96,7 +103,7 @@ A standard-library syntax check can be run with:
 python -m compileall src
 ```
 
-For functional verification, install the package and exercise the real flow with `python -m domovoy`: `/report` in a configured group should produce the deep-link button, and the resulting `/start report_<chat_id>` flow should identify the configured house. Also check the unconfigured-group and invalid-house-payload responses when changing these handlers. Database changes should be checked against a fresh SQLite file and an existing file because initialization uses `IF NOT EXISTS` and does not migrate existing tables.
+Run `python -m compileall src tests` for a syntax check. For functional verification, exercise the flow with valid Telegram credentials: `/report` in a configured group, profile skips, report confirmation, `/my_reports`, `/reports`, and status notification. Database changes must preserve data in an existing database as well as initialize a fresh one.
 
 ## Intended Domain Behavior
 
@@ -104,8 +111,8 @@ The existing project guidance describes the following requirements for future im
 
 - Reports support text and photo/video. Configured locations determine available categories, and categories define required and optional fields.
 - Residents are identified by Telegram profile. On first contact, section, floor, and apartment are optional and individually skippable.
-- Residents create reports and can see all details and status history of their own reports.
-- Responders process assigned reports and change status; administrators manage configuration and assign responders.
+- Residents create text reports and can see all details and status history of their own reports.
+- Responders are configured per house in JSON and process only assigned houses. The administrator from `ADMIN_TELEGRAM_ID` may process all houses.
 - Report content is visible to assigned responders and administrators.
 - Responders are notified of new reports, and residents are notified of status changes.
 
@@ -115,7 +122,7 @@ Keep these authorization and privacy requirements in mind when implementing the 
 
 Keep credentials and local settings in environment variables. `.env`, virtual environments, Python caches, and SQLite files are listed in `.gitignore`. Never commit real bot tokens, credentials, private keys, production configuration, or local databases; keep examples sanitized. The schema includes resident profile details and report content, so database files and Telegram file IDs must be treated as application data with appropriate access controls.
 
-Deployment currently consists of running the single long-polling Python process with its environment, JSON configuration, and a writable SQLite path. There is no Docker, CI, webhook, process-manager, backup, or migration configuration in this checkout; do not describe those as existing deployment steps.
+Deployment currently consists of running the single long-polling Python process with its environment, JSON configuration, and a writable SQLite path. FSM progress is memory-only and is lost on restart. There is no Docker, CI, webhook, process-manager, or backup configuration in this checkout; do not describe those as existing deployment steps.
 
 ## Commit and Pull Request Guidelines
 

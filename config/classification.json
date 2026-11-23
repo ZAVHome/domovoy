@@ -2,21 +2,21 @@
   "locations": [
     {
       "id": "parking",
-      "title": "Parking",
+      "title": "Парковка",
       "categories": [
         {
           "id": "lighting",
-          "title": "Lighting",
+          "title": "Освещение",
           "fields": [
             {
               "id": "description",
-              "title": "Describe the issue",
+              "title": "Опишите проблему",
               "type": "text",
               "required": true
             },
             {
               "id": "parking_space",
-              "title": "Parking space number",
+              "title": "Номер парковочного места",
               "type": "text",
               "required": false
             }
@@ -26,13 +26,29 @@
     },
     {
       "id": "grounds",
-      "title": "Building grounds",
-      "categories": []
+      "title": "Территория дома",
+      "categories": [
+        {
+          "id": "cleanliness",
+          "title": "Уборка территории",
+          "fields": [
+            { "id": "description", "title": "Опишите проблему", "type": "text", "required": true }
+          ]
+        }
+      ]
     },
     {
       "id": "section",
-      "title": "Building section",
-      "categories": []
+      "title": "Подъезд",
+      "categories": [
+        {
+          "id": "maintenance",
+          "title": "Содержание подъезда",
+          "fields": [
+            { "id": "description", "title": "Опишите проблему", "type": "text", "required": true }
+          ]
+        }
+      ]
     }
   ]
 }

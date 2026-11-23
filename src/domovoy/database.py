@@ -18,6 +18,7 @@ def initialize_database(path: Path) -> None:
                 section TEXT,
                 floor TEXT,
                 apartment TEXT,
+                profile_prompted INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -30,6 +31,7 @@ def initialize_database(path: Path) -> None:
                 category_id TEXT,
                 description TEXT,
                 status_id TEXT NOT NULL,
+                submission_token TEXT UNIQUE,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -57,5 +59,37 @@ def initialize_database(path: Path) -> None:
                 note TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             """
+        )
+        user_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(users)")
+        }
+        if "profile_prompted" not in user_columns:
+            connection.execute(
+                "ALTER TABLE users ADD COLUMN profile_prompted INTEGER NOT NULL DEFAULT 0"
+            )
+        report_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(reports)")
+        }
+        if "submission_token" not in report_columns:
+            connection.execute("ALTER TABLE reports ADD COLUMN submission_token TEXT")
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_submission_token "
+            "ON reports(submission_token)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reports_author_created "
+            "ON reports(author_telegram_user_id, created_at DESC)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reports_house_status "
+            "ON reports(house_id, status_id, created_at DESC)"
+        )
+        connection.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version) VALUES (1), (2)"
         )
