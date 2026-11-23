@@ -126,4 +126,4 @@ Deployment currently consists of running the single long-polling Python process 
 
 ## Commit and Pull Request Guidelines
 
-The repository is initialized on branch `master`, but it has no commits yet, so no established commit convention can be confirmed. Until one is adopted, use concise, imperative commit subjects such as `Add configuration loader`. Pull requests should explain the change and motivation, list validation performed, link relevant issues where applicable, and include screenshots for user-facing visual changes.
+Before each commit intended for GitHub, increase the bot version in `pyproject.toml` by `0.01` and include that version change in the commit. Start at `0.01`, then use `0.02`, `0.03`, and so on. The initial project commit is on branch `master`; use concise, imperative commit subjects such as `Add configuration loader`. Pull requests should explain the change and motivation, list validation performed, link relevant issues where applicable, and include screenshots for user-facing visual changes.
